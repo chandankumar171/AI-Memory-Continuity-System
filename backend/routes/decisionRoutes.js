@@ -1,7 +1,7 @@
 const express = require("express");
 const Decision = require("../models/Decision");
 const generateAdvice = require("../services/aiRecall");
-const auth = require("../middleware/auth");
+const auth = require("../middleware/authMiddleware");
 
 const router = express.Router();
 

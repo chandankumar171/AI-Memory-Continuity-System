@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
+import api from "./api/axios";
 
 export default function Signup() {
   const [name, setName] = useState("");
@@ -7,7 +7,7 @@ export default function Signup() {
   const [password, setPassword] = useState("");
 
   const signup = async () => {
-    await axios.post("http://localhost:5000/api/auth/signup", {
+    await api.post("/api/auth/signup", {
       name, email, password
     });
     alert("Signup successful. Please login.");

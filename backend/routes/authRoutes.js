@@ -9,6 +9,11 @@ const router = express.Router();
 router.post("/signup", async (req, res) => {
   const { name, email, password } = req.body;
 
+   const exists = await User.findOne({ email });
+  if (exists) {
+    return res.status(400).json({ message: "Email already registered" });
+  }
+
   const hashedPassword = await bcrypt.hash(password, 10);
   const user = new User({ name, email, password: hashedPassword });
 
@@ -18,6 +23,8 @@ router.post("/signup", async (req, res) => {
 
 // Login
 router.post("/login", async (req, res) => {
+  try{
+    console.log("LOGIN BODY:", req.body); // 👈 ADD THIS
   const { email, password } = req.body;
 
   const user = await User.findOne({ email });
@@ -35,6 +42,9 @@ router.post("/login", async (req, res) => {
   );
 
   res.json({ token });
+} catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 module.exports = router;

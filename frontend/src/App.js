@@ -1,42 +1,17 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "./api/axios";
 import "./App.css";
 
 function App() {
   /* ================= AUTH ================= */
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [isLogin, setIsLogin] = useState(true);
-  
-  const showToast = (message) => {
-  setToast(message);
-  setTimeout(() => setToast(""), 3000);
-};
 
   const [authData, setAuthData] = useState({
     name: "",
     email: "",
     password: ""
   });
-
-  const getRelativeTime = (date) => {
-  const today = new Date();
-  const decisionDate = new Date(date);
-
-  // Normalize both dates to midnight (local)
-  today.setHours(0, 0, 0, 0);
-  decisionDate.setHours(0, 0, 0, 0);
-
-  const diffMs = today - decisionDate;
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return "today";
-  if (diffDays === 1) return "yesterday";
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-
-  return `${Math.floor(diffDays / 365)} years ago`;
-};
 
   /* ================= UI ================= */
   const [activeTab, setActiveTab] = useState("add");
@@ -61,7 +36,32 @@ function App() {
   const [selectedDecision, setSelectedDecision] = useState("");
   const [aiQuestion, setAiQuestion] = useState("");
   const [aiResponse, setAiResponse] = useState("");
+
+  /* ================= TOAST ================= */
   const [toast, setToast] = useState("");
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3000);
+  };
+
+  /* ================= HELPERS ================= */
+  const getRelativeTime = (date) => {
+    const today = new Date();
+    const d = new Date(date);
+
+    today.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+
+    const diff = Math.round((today - d) / (1000 * 60 * 60 * 24));
+
+    if (diff === 0) return "today";
+    if (diff === 1) return "yesterday";
+    if (diff < 7) return `${diff} days ago`;
+    if (diff < 30) return `${Math.floor(diff / 7)} weeks ago`;
+    if (diff < 365) return `${Math.floor(diff / 30)} months ago`;
+    return `${Math.floor(diff / 365)} years ago`;
+  };
 
   /* ================= EFFECTS ================= */
   useEffect(() => {
@@ -73,18 +73,15 @@ function App() {
     if (token) fetchDecisions();
   }, [token]);
 
-  /* ================= AUTH FUNCTIONS ================= */
+  /* ================= AUTH ================= */
   const signup = async () => {
-    await axios.post("http://localhost:5000/api/auth/signup", authData);
+    await api.post("/api/auth/signup", authData);
     alert("Signup successful. Please login.");
     setIsLogin(true);
   };
 
   const login = async () => {
-    const res = await axios.post(
-      "http://localhost:5000/api/auth/login",
-      authData
-    );
+    const res = await api.post("/api/auth/login", authData);
     localStorage.setItem("token", res.data.token);
     setToken(res.data.token);
     setActiveTab("add");
@@ -95,11 +92,9 @@ function App() {
     setToken(null);
   };
 
-  /* ================= DATA FUNCTIONS ================= */
+  /* ================= DATA ================= */
   const fetchDecisions = async () => {
-    const res = await axios.get("http://localhost:5000/api/decisions", {
-      headers: { Authorization: token }
-    });
+    const res = await api.get("/api/decisions");
     setDecisions(res.data);
   };
 
@@ -111,19 +106,11 @@ function App() {
     };
 
     if (editingId) {
-      await axios.put(
-        `http://localhost:5000/api/decisions/${editingId}`,
-        payload,
-        { headers: { Authorization: token } }
-      );
+      await api.put(`/api/decisions/${editingId}`, payload);
       setEditingId(null);
       setActiveTab("timeline");
     } else {
-      await axios.post(
-        "http://localhost:5000/api/decisions",
-        payload,
-        { headers: { Authorization: token } }
-      );
+      await api.post("/api/decisions", payload);
       showToast("Decision saved successfully!");
     }
 
@@ -154,27 +141,19 @@ function App() {
 
   const deleteDecision = async (id) => {
     if (!window.confirm("Delete this decision?")) return;
-
-    await axios.delete(
-      `http://localhost:5000/api/decisions/${id}`,
-      { headers: { Authorization: token } }
-    );
+    await api.delete(`/api/decisions/${id}`);
     fetchDecisions();
-    showToast("Decision deleted successfully!");
+    showToast("Decision deleted");
   };
 
   /* ================= AI ================= */
   const askAI = async () => {
-    if (!selectedDecision) {
-      alert("Please select a decision");
-      return;
-    }
+    if (!selectedDecision) return alert("Select a decision");
 
-    const res = await axios.post(
-      "http://localhost:5000/api/decisions/ai-recall",
-      { question: aiQuestion, decisionId: selectedDecision },
-      { headers: { Authorization: token } }
-    );
+    const res = await api.post("/api/decisions/ai-recall", {
+      question: aiQuestion,
+      decisionId: selectedDecision
+    });
 
     setAiResponse(res.data.advice);
   };
@@ -217,10 +196,7 @@ function App() {
             {isLogin ? "Login" : "Signup"}
           </button>
 
-          <p
-            style={{ cursor: "pointer", color: "#4f46e5" }}
-            onClick={() => setIsLogin(!isLogin)}
-          >
+          <p onClick={() => setIsLogin(!isLogin)} style={{ cursor: "pointer" }}>
             {isLogin ? "New user? Signup" : "Already have an account? Login"}
           </p>
         </div>
@@ -235,185 +211,83 @@ function App() {
       <div className="nav">
         <h1>IntentAI</h1>
         <div className="actions">
-          <button
-            className={`nav-btn ${activeTab === "add" ? "active" : ""}`}
-            onClick={() => setActiveTab("add")}
-          >
-            Add Decision
-          </button>
-
-          <button
-            className={`nav-btn ${activeTab === "timeline" ? "active" : ""}`}
-            onClick={() => setActiveTab("timeline")}
-          >
-            Timeline
-          </button>
-
-          <button
-            className={`nav-btn ${activeTab === "ai" ? "active" : ""}`}
-            onClick={() => setActiveTab("ai")}
-          >
-            Ask AI
-          </button>
-
-          <button
-            className="secondary"
-            onClick={() => setDarkMode(!darkMode)}
-          >
+          <button onClick={() => setActiveTab("add")}>Add</button>
+          <button onClick={() => setActiveTab("timeline")}>Timeline</button>
+          <button onClick={() => setActiveTab("ai")}>Ask AI</button>
+          <button onClick={() => setDarkMode(!darkMode)}>
             {darkMode ? "☀ Light" : "🌙 Dark"}
           </button>
-
-          <button className="danger" onClick={logout}>
-            Logout
-          </button>
+          <button className="danger" onClick={logout}>Logout</button>
         </div>
       </div>
 
-      {/* ADD / EDIT */}
+      {/* ADD */}
       {activeTab === "add" && (
         <div className="card">
-          <h2>{editingId ? "Edit Decision" : "Add New Decision"}</h2>
+          <h2>{editingId ? "Edit Decision" : "Add Decision"}</h2>
 
-          <input
-            placeholder="Decision Title"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-          />
+          <input placeholder="Title" value={form.title}
+            onChange={e => setForm({ ...form, title: e.target.value })} />
 
-          <input
-            placeholder="Intent / Goal"
-            value={form.intent}
-            onChange={(e) => setForm({ ...form, intent: e.target.value })}
-          />
+          <input placeholder="Intent" value={form.intent}
+            onChange={e => setForm({ ...form, intent: e.target.value })} />
 
-          <input
-            placeholder="Constraints (comma separated)"
-            value={form.constraints}
-            onChange={(e) =>
-              setForm({ ...form, constraints: e.target.value })
-            }
-          />
+          <input placeholder="Constraints (comma separated)" value={form.constraints}
+            onChange={e => setForm({ ...form, constraints: e.target.value })} />
 
-          <input
-            placeholder="Alternatives (comma separated)"
-            value={form.alternatives}
-            onChange={(e) =>
-              setForm({ ...form, alternatives: e.target.value })
-            }
-          />
+          <input placeholder="Alternatives (comma separated)" value={form.alternatives}
+            onChange={e => setForm({ ...form, alternatives: e.target.value })} />
 
-          <input
-            placeholder="Final Choice"
-            value={form.finalChoice}
-            onChange={(e) =>
-              setForm({ ...form, finalChoice: e.target.value })
-            }
-          />
+          <input placeholder="Final Choice" value={form.finalChoice}
+            onChange={e => setForm({ ...form, finalChoice: e.target.value })} />
 
-          <textarea
-            placeholder="Reason behind the decision"
-            value={form.reasoning}
-            onChange={(e) =>
-              setForm({ ...form, reasoning: e.target.value })
-            }
-          />
+          <textarea placeholder="Reasoning" value={form.reasoning}
+            onChange={e => setForm({ ...form, reasoning: e.target.value })} />
 
           <button className="primary" onClick={saveDecision}>
-            {editingId ? "Update Decision" : "Save Decision"}
+            {editingId ? "Update" : "Save"}
           </button>
         </div>
       )}
 
       {/* TIMELINE */}
-      {activeTab === "timeline" && (
-        <>
-          <h2>Your Decision Timeline</h2>
+      {activeTab === "timeline" && decisions.map(d => (
+        <div className="card" key={d._id}>
+          <h3>{d.title}</h3>
+          <p>{d.intent}</p>
+          <p>{d.finalChoice}</p>
+          <p>{getRelativeTime(d.createdAt)}</p>
 
-          {decisions.map((d) => (
-            <div className="card" key={d._id}>
-              <h3>{d.title}</h3>
-              <p><strong>Date:</strong> {new Date(d.createdAt).toLocaleDateString("en-GB", {
-                day:"2-digit",
-                month:"short",
-                year:"numeric"
-              })}</p>
-              <p><strong>Intent:</strong> {d.intent}</p>
-              <p><strong>Final Choice:</strong> {d.finalChoice}</p>
-              <p><strong>Reasoning:</strong> {d.reasoning}</p>
-
-              <div className="actions">
-                <button className="secondary" onClick={() => editDecision(d)}>
-                  Edit
-                </button>
-                <button className="danger" onClick={() => deleteDecision(d._id)}>
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </>
-      )}
+          <button onClick={() => editDecision(d)}>Edit</button>
+          <button className="danger" onClick={() => deleteDecision(d._id)}>Delete</button>
+        </div>
+      ))}
 
       {/* AI */}
       {activeTab === "ai" && (
         <div className="card">
-          <h2>Ask AI</h2>
-
-          <select
-            value={selectedDecision}
-            onChange={(e) => setSelectedDecision(e.target.value)}
-          >
+          <select value={selectedDecision}
+            onChange={e => setSelectedDecision(e.target.value)}>
             <option value="">Select decision</option>
-            {decisions.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.title}
-              </option>
+            {decisions.map(d => (
+              <option key={d._id} value={d._id}>{d.title}</option>
             ))}
           </select>
 
-          <input
-            placeholder="Ask your question..."
+          <input placeholder="Ask AI"
             value={aiQuestion}
-            onChange={(e) => setAiQuestion(e.target.value)}
-          />
+            onChange={e => setAiQuestion(e.target.value)} />
 
-          <button className="primary" onClick={askAI}>
-            Ask AI
-          </button>
+          <button onClick={askAI}>Ask</button>
 
-          {aiResponse && selectedDecision && (
-  <div className="ai-box">
-    <p style={{ fontSize: "13px", opacity: 0.7, marginBottom: "8px" }}>
-      Based on your decision made on{" "}
-      <strong>
-        {new Date(
-          decisions.find(d => d._id === selectedDecision)?.createdAt
-        ).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric"
-        })}
-      </strong>{" "}
-      ({getRelativeTime(
-        decisions.find(d => d._id === selectedDecision)?.createdAt
-      )})
-    </p>
-
-    <div>{aiResponse}</div>
-  </div>
-)}
+          {aiResponse && <div className="ai-box">{aiResponse}</div>}
         </div>
       )}
 
-      {toast && (
-  <div className="toast">
-    {toast}
-  </div>
-)}
-
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
-
 }
 
 export default App;
+
