@@ -5,44 +5,72 @@ const User = require("../models/User");
 
 const router = express.Router();
 
-// Signup
+// ✅ SIGNUP
 router.post("/signup", async (req, res) => {
-  const { name, email, password } = req.body;
+  try {
+    const { name, email, password } = req.body;
 
-   const exists = await User.findOne({ email });
-  if (exists) {
-    return res.status(400).json({ message: "Email already registered" });
+    // validation
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const exists = await User.findOne({ email });
+    if (exists) {
+      return res.status(400).json({ message: "Email already registered" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+    });
+
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    res.status(201).json({ token, user });
+  } catch (err) {
+    console.error("SIGNUP ERROR:", err);
+    res.status(500).json({ message: "Server error" });
   }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = new User({ name, email, password: hashedPassword });
-
-  await user.save();
-  res.json({ message: "User registered" });
 });
 
-// Login
+// ✅ LOGIN
 router.post("/login", async (req, res) => {
-  try{
-    console.log("LOGIN BODY:", req.body); // 👈 ADD THIS
-  const { email, password } = req.body;
+  try {
+    console.log("LOGIN BODY:", req.body);
 
-  const user = await User.findOne({ email });
-  if (!user)
-    return res.status(401).json({ message: "Invalid credentials" });
+    const { email, password } = req.body;
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch)
-    return res.status(401).json({ message: "Invalid credentials" });
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
+    }
 
-  const token = jwt.sign(
-    { userId: user._id },
-    process.env.JWT_SECRET, 
-    { expiresIn: "1d" }
-  );
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
-  res.json({ token });
-} catch (err) {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    res.json({ token, user });
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
